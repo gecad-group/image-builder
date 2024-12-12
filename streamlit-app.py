@@ -59,7 +59,7 @@ if st.button("Build image", disabled=st.session_state.id is None or len(st.sessi
 
         with st.spinner("Building..."):
             build_targets = ",".join([target for target, flag in zip(["linux/amd64", "linux/arm64"], [st.session_state.amd64_build, st.session_state.arm64_build]) if flag])
-            build = subprocess.run(f"docker buildx build --progress=plain --platform {build_targets} -t {projectName.lower()} {projectPath}", shell=True, universal_newlines=True, capture_output=True)
+            build = subprocess.run(f"docker buildx build --platform {build_targets} -t {projectName.lower()} {projectPath}", shell=True, universal_newlines=True, capture_output=True)
             history = subprocess.run(f"docker image history {projectName.lower()}", shell=True, universal_newlines=True, capture_output=True)
         st.success("Image built")
         # Why does it output to stderr? Spent more time than needed trying to understand what was going on
