@@ -38,11 +38,13 @@ with col1:
                  disabled=st.session_state.id is None or len(st.session_state.id) < 5 or file is None, value=get_dockerfile(file))
 
 with col2:
-    st.text_input("Version Tag", key="version_tag", disabled=file is None, value="latest",
+    st.text_input("Version Tag", key="version_tag", disabled=st.session_state.id is None or len(st.session_state.id) < 5 or file is None, value="latest",
                   help="You can push multiple tags by separating them with a comma\n\nExample: `latest,v1.0`")
     st.write("Build for:")
-    st.checkbox("PC", value=True, key="amd64_build", disabled=file is None)
-    st.checkbox("Raspberry Pi", key="arm64_build", disabled=file is None)
+    st.checkbox("PC", value=True, key="amd64_build", disabled=st.session_state.id is None or len(st.session_state.id) < 5 or file is None)
+    st.checkbox("Raspberry Pi", key="arm64_build", disabled=st.session_state.id is None or len(st.session_state.id) < 5 or file is None)
+
+st.checkbox("Push to registry", key="push_to_registry", value=False, disabled=st.session_state.id is None or len(st.session_state.id) < 5 or file is None)
 
 
 if st.button("Build image", disabled=st.session_state.id is None or len(st.session_state.id) < 5 or file is None):
@@ -87,20 +89,31 @@ if st.button("Build image", disabled=st.session_state.id is None or len(st.sessi
 
         # Tag the image
         with st.spinner("Image tagging..."):
-            st.write(imageTags)
+            for tag in imageTags:
+                tagCommand = f"docker tag {imageName} {imageName}:{tag}"
+                tagProc = subprocess.run(tagCommand, shell=True, universal_newlines=True, capture_output=True)
+                if tagProc.returncode != 0:
+                    st.error(f"Image tag failed for {tag}")
+                    status.update(label="Failed to tag image", state="error")
+                    st.stop()
+                else:
+                    st.success(f"Image tagged as {tag}")
 
         # Push the image
-        with st.spinner("Pushing image..."):
-            push = subprocess.run(f"docker push {imageName}", shell=True, universal_newlines=True, capture_output=True)
+        if st.session_state.push_to_registry:
+            with st.spinner("Pushing image..."):
+                push = subprocess.run(f"docker push -a {imageName}", shell=True, universal_newlines=True, capture_output=True)
 
-        if push.returncode != 0:
-            st.error("Image push failed")
-            st.text_area("Push Log", value=push.stderr, disabled=True)
-            status.update(label="Failed to push image", state="error")
-            st.stop()
+            if push.returncode != 0:
+                st.error("Image push failed")
+                st.text_area("Push Log", value=push.stderr, disabled=True)
+                status.update(label="Failed to push image", state="error")
+                st.stop()
+            else:
+                st.success("Image pushed")
+                st.text_area("Push Log", value=push.stdout, disabled=True)
         else:
-            st.success("Image pushed")
-            st.text_area("Push Log", value=push.stdout, disabled=True)
+            st.warning("Image not pushed to registry")
 
         # Clean up
         with st.spinner("Cleaning up..."):
